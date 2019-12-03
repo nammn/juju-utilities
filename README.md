@@ -1,4 +1,4 @@
-# Utiliy files for juju
+# Utility files for juju
 - mostly used for ease of local development
 - both should be placed in $PATH such that JUJU can read and use them (juju dynamically searches the path for files prefixed with `juju`)
 ## Juju-db
