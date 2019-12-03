@@ -1,0 +1,72 @@
+#!/bin/bash
+
+machine=0
+model=controller
+ip=`juju machines -m controller --format=json | jq '.machines[]."dns-name"'`
+agent=machine
+id=0
+copy_dlv=1
+
+function usage
+{
+    echo "usage: juju-debug [-m <model>] [-n <machine>] [-a <agent-type>] [-i <agent-id>]"
+}
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -a | --agent ) shift
+                       agent=$1
+                       ;;
+        -i | --id ) shift
+                    id=$1
+                    ;;
+        -m | --model ) shift
+                    model=$1
+                    ;;
+        -n | --machine ) shift
+                    machine=$1
+                    ;;
+        -d | --nodlv ) shift
+                    copy_dlv=0
+                    ;;
+        -h | --help ) usage
+                      exit
+                      ;;
+        * )           usage
+                      exit 1
+    esac
+    shift
+done
+
+dlv=`which dlv`
+if [ $? -ne 0 ]; then
+ echo "dlv not found in path"
+ exit 1
+fi
+echo Using dlv=$dlv
+
+echo model $model
+echo machine $machine
+echo agent $agent-$id
+echo ip $ip
+read -d '' -r dlvcmds <<'EOF'
+jujud_pid=`pgrep -f "/var/lib/juju/tools/%s-%s/jujud"`
+if [ $? -ne 0 ]; then
+  echo "no agent found for $agent %s"
+  exit 1
+fi
+
+ids=($jujud_pid)
+jujud_pid=${ids[0]}
+echo Connecting to process $jujud_pid
+
+port=2345
+sudo /home/ubuntu/dlv --headless --listen=:$port --api-version=2 --accept-multiclient attach $jujud_pid
+EOF
+dlvcmds=$(printf "$dlvcmds" $agent $id $id)
+
+if [ "$copy_dlv" -eq "1" ]; then
+  juju scp -m $model $dlv $machine:
+fi  
+
+juju ssh -m $model $machine "$dlvcmds"
